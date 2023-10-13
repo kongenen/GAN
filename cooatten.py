@@ -27,6 +27,10 @@ class CoordAttention(nn.Module):
         self.pool_w, self.pool_h = nn.AdaptiveAvgPool2d((1, None)), nn.AdaptiveAvgPool2d((None, 1))
         temp_c = max(1, in_channels // reduction)
         self.conv1 = nn.Conv2d(in_channels, temp_c, kernel_size=1, stride=1, padding=0)
+        self.conv1_3 = nn.Conv2d(in_channels, temp_c, kernel_size=3, stride=1, padding=1)
+        self.conv1_5 = nn.Conv2d(in_channels, temp_c, kernel_size=5, stride=1, padding=2)
+
+        self.conv = nn.Conv2d(temp_c * 3, temp_c, kernel_size=1, stride=1, padding=0)
 
         self.bn1 = nn.BatchNorm2d(temp_c)
         self.act1 = h_swish()
@@ -39,7 +43,15 @@ class CoordAttention(nn.Module):
         n, c, H, W = x.shape
         x_h, x_w = self.pool_h(x), self.pool_w(x).permute(0, 1, 3, 2)
         x_cat = torch.cat([x_h, x_w], dim=2)
-        out = self.act1(self.bn1(self.conv1(x_cat)))
+
+        x1 = self.conv1(x_cat)
+        #print(x1.shape)
+        x2 = self.conv1_3(x_cat)
+        #print(x2.shape)
+        x3 = self.conv1_5(x_cat)
+        #print(x3.shape)
+        x = torch.cat([x1, x2, x3],dim=1)
+        out = self.act1(self.bn1(self.conv(x)))
         x_h, x_w = torch.split(out, [H, W], dim=2)
         x_w = x_w.permute(0, 1, 3, 2)
         out_h = torch.sigmoid(self.conv2(x_h))
